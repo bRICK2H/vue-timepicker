@@ -1,52 +1,72 @@
 <template>
-	<div class="v-input-reference v-input-time-container"
+	<div class="v-input-time-container"
 		:class="[setClassFocusContainer, setClassDisabledContainer, inputRef]"
 		:style="setStyleContainer"
-		:tabindex="tabindex"
+		:tabindex="disabled ? null : tabindex"
 		:ref="inputRefContainer"
 		@focus="focusContainer"
 	>
 		
-		<div class="v-input-reference v-input-time-box"
-			:class="inputRef"
+		<div class="v-input-time-content"
+			:style="{ order: side === 'left' ? 0 : 1 }"
+			:class="[inputRef, { 'v-input-time-content--underline': underline }]"
 		>
-			<span v-show="prefix" 
+			<span v-show="prefix"
 				class="v-input-prefix"
 			>
 				{{ prefix }}
 			</span>
 
-			<input v-for="(value, i) of arrayValue"
-				class="v-input-reference v-input-time"
-				type="text"
-				:class="[setClassActiveInput, inputRef, seClassUnderline]"
-				:style="{ width: `${inputOptions[i].maxLen * 12}px` }"
-				:key="i"
-				:value="value"
-				:ref="inputRef"
-				:disabled="disabled"
-				@blur="blur"
-				@keydown="keydown($event, i)"
-				@keypress="keypress($event)"
-				@input="input($event, i)"
-				@click="click($event, i)"
-				@select="select(i)"
-			>
+			<div class="v-input-box">
+				<span class="v-input-separator">:</span>
+				<input v-for="(value, i) of arrayValue"
+					class="v-input-time-item"
+					type="text"
+					:class="[setClassActiveInput, inputRef, seClassUnderline]"
+					:style="[
+						{ width: `${inputOptions[i].maxLen * 10}px` },
+						{ cursor: disabled ? 'no-drop' : 'default' }
+					]"
+					:key="i"
+					:value="value"
+					:ref="inputRef"
+					:disabled="disabled"
+					@blur="blur"
+					@keydown="keydown($event, i)"
+					@keypress="keypress($event)"
+					@input="input($event, i)"
+					@click="click($event, i)"
+					@select="select(i)"
+				>
+			</div>
 		</div>
 
-		<img src="./assets/img/clock.png" alt="clock">
+		<template v-show="icons[icon]">
+			<component :is="icons[icon]" />	
+		</template>
 
 	</div>
 </template>
 
 <script>
+import VClock from './assets/svg/v-clock'
+import VHourglass from './assets/svg/v-hourglass'
+
 export default {
 	name: 'VTimePicker',
+	components: {
+		VHourglass,
+		VClock
+	},
 	props: {
 		value: null,
 		maxHour: {
 			type: Number,
 			default: 24
+		},
+		stopTime: {
+			type: Object,
+			default: null
 		},
 		inclusive: {
 			type: Boolean,
@@ -60,11 +80,23 @@ export default {
 			type: Boolean,
 			default: false
 		},
+		side: {
+			type: String,
+			default: 'left'
+		},
+		icon: {
+			type: String,
+			default: 'clock'
+		},
 		disabled: {
 			type: Boolean,
 			default: false
 		},
 		width: {
+			type: [String, Number],
+			default: 150
+		},
+		maxWidth: {
 			type: [String, Number],
 			default: 150
 		},
@@ -89,6 +121,11 @@ export default {
 			start: 0,
 			end: 0
 		},
+		icons: {
+			clock: 'VClock',
+			hourglass: 'VHourglass'
+		},
+		prevValue: 0,
 		typeValue: 'string',
 		tabindex: 0,
 		currIndex: 0,
@@ -99,14 +136,16 @@ export default {
 		arrayValue() {
 			let data = []
 
-			if (typeof this.value === 'number') {
-				this.typeValue = 'number'
-				let hours = String(Math.floor(this.value / 60))
-				let minutes = String(this.value - (+hours * 60))
-
-				data = [hours, minutes]
-			} else {
-				data = this.value.split(':')
+			if (typeof this.value !== 'undefined') {
+				if (typeof this.value === 'number') {
+					this.typeValue = 'number'
+					let hours = String(Math.floor(this.value / 60))
+					let minutes = String(this.value - (+hours * 60))
+	
+					data = [hours, minutes]
+				} else {
+					data = this.value.split(':')
+				}
 			}
 			
 			let [hours, minutes] = data
@@ -126,29 +165,30 @@ export default {
 		},
 		setClassActiveInput() {
 			if (!this.underline) return null
-			if (this.isFocus) {
+			if (this.isFocus && !this.disabled) {
 				return this.currIndex === 0
-					? 'v-input-time--f-active'
-					: 'v-input-time--s-active'
+					? 'v-input-time-item--f-active'
+					: 'v-input-time-item--s-active'
 			} else {
 				return null
 			}
 		},
 		setClassFocusContainer() {
-			return this.isFocus ? 'v-input-time-container--focus' : null
+			return this.isFocus && !this.disabled ? 'v-input-time-container--focus' : null
 		},
 		setClassDisabledContainer() {
 			return this.disabled ? 'v-input-time-container--disabled' : null
 		},
 		setStyleContainer() {
 			return {
-				maxWidth: `${this.width}px`,
+				width: `${this.width}px`,
+				maxWidth: `${this.maxWidth}px`,
 				height: `${this.height}px`,
 				margin: String(this.margin).split(' ').map(p => `${p}px`).join(' ')
 			}
 		},
 		seClassUnderline() {
-			return this.underline ? 'v-input-time--underline' : 'v-input-time--hideline'
+			return this.underline ? 'v-input-time-item--underline' : 'v-input-time-item--hideline'
 		}
 	},
 	methods: {
@@ -426,7 +466,7 @@ export default {
 				return value
 				
 			}
-			
+
 			this.save(index, formatValue(counter))
 		},
 
@@ -447,12 +487,42 @@ export default {
 	watch: {
 		isFocus(focus) {
 			if (!focus) this.$emit('blur')
-		}
+		},
+		value: {
+			immediate: true,
+			handler(value) {
+				if (this.stopTime) {
+					const { type, value: stopValue } = this.stopTime
+
+					if (type === 'until') {
+						let currTime = 0
+
+						if (typeof value === 'number') {
+							currTime = value
+						} else {
+							const [hours, minutes] = value.split(':')
+							currTime = (+hours * 60) + +minutes
+						}
+
+						if (currTime > stopValue) {
+							this.$emit('input', stopValue)
+						}
+					} else {
+						if (stopValue < 0) {
+							this.$emit('input', this.prevValue)
+						} else {
+							this.prevValue = value
+						}
+					}
+				}
+			}
+		},
 	},
 	created() {
 		this.inputRef = `input-time-ref:${String(Math.random()).slice(2, 10)}`
 		this.inputRefContainer = `input-container:${String(Math.random()).slice(2, 10)}`
-		this.inputOptions[0].maxLen = +String(this.maxHour).length
+		const maxLen = +String(this.maxHour).length
+		this.inputOptions[0].maxLen = maxLen < 2 ? 2 : maxLen
 		this.inputOptions[0].maxVal = this.maxHour
 	},
 	mounted() {
@@ -469,71 +539,81 @@ export default {
 	.v-input-time-container {
 		width: 100%;
 		height: 48px;
+		padding: 0 5px;
 		display: flex;
 		justify-content: space-around;
 		align-items: center;
 		user-select: none;
 		background: #fff;
 		border: 2px solid #eeedf7;
-		border-radius: 12px;
+		border-radius: 8px;
 
 		&--focus {
 			border: 2px solid #cfcde5;
 		}
 		&--disabled {
 			opacity: 0.6;
+			cursor: no-drop;
 		}
 	}
-	.v-input-time-box {
+	.v-input-time-content {
+		display: flex;
 		position: relative;
-
-		&::after {
-			content: ':';
-			position: absolute;
-			top: calc(50% - 1px);
-			right: 30px;
-			transform: translateY(-50%);
-			font-size: 16px;
-			font-weight: 900;
-			color: #76768C;
+		
+		&--underline {
+			top: 1px;
+			
+			&::after {
+				top: 8px;
+				color: #9e9cb9;
+			}
 		}
 	}
-	.v-input-time {
+	.v-input-box {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+	.v-input-separator {
+		order: 1;
+		font-size: 14px;
+		font-weight: 700;
+	}
+	.v-input-time-item {
 		width: 0;
-		min-width: 30px;
+		min-width: 22px;
 		text-align: center;
 		font-size: 14px;
-		font-weight: 500;
+		font-weight: 400;
 		outline: none;
 		border: none;
-		color: #76768C;
+		color: #1f1f33;
+		background: none;
 
 		&--hideline {
 			border-bottom: none;
 		}
 		&--underline {
-			padding-bottom: 2px;
-			border-bottom: 2px solid #eeedf7;
+			position: relative;
+			padding-bottom: 0;
+			border-bottom: 2px solid #cfcde5;
 			transition: .1s;
 		}
 
 		&:focus {
 			color: #76768C;
 		}
-		&:first-of-type {
-			margin-right: 2px;
-		}
 		&:last-of-type {
-			margin-left: 2px;
+			order: 2;
 		}
 		&--f-active {
 			&:first-of-type {
-				border-bottom: 2px solid #cfcde5;
+				border-bottom: 2px solid #A2A2B9;
 			}
 		}
 		&--s-active {
 			&:last-of-type {
-				border-bottom: 2px solid #cfcde5;
+				border-bottom: 2px solid #A2A2B9;
 			}
 		}
 	}
